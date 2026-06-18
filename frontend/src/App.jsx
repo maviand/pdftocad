@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { UploadCloud, FileType, CheckCircle, AlertCircle, Download } from 'lucide-react';
 
 function App() {
+  const [mode, setMode] = useState('pdf'); // 'pdf' or 'sketch'
   const [file, setFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
@@ -19,26 +20,47 @@ function App() {
     setIsDragging(false);
   };
 
+  const isValidFile = (droppedFile) => {
+    if (mode === 'pdf') {
+      return droppedFile.type === 'application/pdf';
+    } else {
+      return ['image/jpeg', 'image/png'].includes(droppedFile.type);
+    }
+  }
+
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const droppedFile = e.dataTransfer.files[0];
-      if (droppedFile.type === 'application/pdf') {
+      if (isValidFile(droppedFile)) {
         setFile(droppedFile);
         setStatus(null);
       } else {
         setStatus('error');
-        setErrorMessage('Please upload a valid PDF file.');
+        setErrorMessage(mode === 'pdf' ? 'Please upload a valid PDF file.' : 'Please upload a JPG or PNG image.');
       }
     }
   };
 
   const handleFileSelect = (e) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setStatus(null);
+      const selectedFile = e.target.files[0];
+      if (isValidFile(selectedFile)) {
+        setFile(selectedFile);
+        setStatus(null);
+      } else {
+        setStatus('error');
+        setErrorMessage(mode === 'pdf' ? 'Please upload a valid PDF file.' : 'Please upload a JPG or PNG image.');
+      }
     }
+  };
+
+  const handleModeSwitch = (newMode) => {
+    setMode(newMode);
+    setFile(null);
+    setStatus(null);
+    setErrorMessage('');
   };
 
   const handleConvert = async () => {
@@ -51,8 +73,10 @@ function App() {
     const formData = new FormData();
     formData.append('file', file);
 
+    const endpoint = mode === 'pdf' ? 'http://localhost:8000/convert' : 'http://localhost:8000/convert-sketch';
+
     try {
-      const response = await fetch('http://localhost:8000/convert', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         body: formData,
       });
@@ -67,7 +91,8 @@ function App() {
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = file.name.replace('.pdf', '.dxf');
+      const ext = file.name.substring(file.name.lastIndexOf('.'));
+      link.download = file.name.replace(ext, '.dxf');
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -91,11 +116,26 @@ function App() {
           alt="ANV Logo" 
           style={{ height: '80px', marginBottom: '1rem', animation: 'fade-in-up 0.6s ease-out' }} 
         />
-        <h1>PDF to CAD Converter</h1>
-        <p>Transform your technical drawings into editable DXF files instantly.</p>
+        <h1>{mode === 'pdf' ? 'PDF to CAD Converter' : 'Sketch to CAD Converter'}</h1>
+        <p>{mode === 'pdf' ? 'Transform your technical drawings into editable DXF files instantly.' : 'Turn your hand-drawn sketches into vectorized CAD geometry.'}</p>
       </header>
 
       <main className="glass-panel">
+        <div className="tabs">
+          <button 
+            className={`tab ${mode === 'pdf' ? 'active' : ''}`}
+            onClick={() => handleModeSwitch('pdf')}
+          >
+            PDF Floorplan
+          </button>
+          <button 
+            className={`tab ${mode === 'sketch' ? 'active' : ''}`}
+            onClick={() => handleModeSwitch('sketch')}
+          >
+            Hand-drawn Sketch
+          </button>
+        </div>
+
         <div 
           className={`drop-zone ${isDragging ? 'active' : ''}`}
           onDragOver={handleDragOver}
@@ -104,13 +144,13 @@ function App() {
           onClick={() => fileInputRef.current.click()}
         >
           <UploadCloud className="upload-icon" />
-          <h3>Drag & Drop your PDF here</h3>
+          <h3>Drag & Drop your {mode === 'pdf' ? 'PDF' : 'Image'} here</h3>
           <p>or click to browse</p>
           <input 
             type="file" 
             ref={fileInputRef} 
             onChange={handleFileSelect} 
-            accept="application/pdf"
+            accept={mode === 'pdf' ? "application/pdf" : "image/jpeg, image/png"}
             style={{ display: 'none' }} 
           />
         </div>

@@ -81,3 +81,22 @@ def generate_dxf(extracted_data: dict, output_path: str):
 
     # Save the DXF
     doc.saveas(output_path)
+
+def generate_dxf_from_contours(contours: list, output_path: str):
+    """
+    Takes processed contours from an image (sketch) and generates a DXF.
+    """
+    doc = ezdxf.new("R2010")
+    msp = doc.modelspace()
+    
+    # Create specific layer for sketch
+    doc.layers.add("Sketch_Lines", color=7)
+    
+    for cnt in contours:
+        # A contour is a list of (x, y) tuples
+        if len(cnt) > 2:
+            # We close the polyline if it represents a closed shape,
+            # but since users might draw open lines, let's just draw them open
+            msp.add_lwpolyline(cnt, dxfattribs={"layer": "Sketch_Lines"}, close=True)
+            
+    doc.saveas(output_path)

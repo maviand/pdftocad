@@ -5,6 +5,7 @@ import os
 import shutil
 import uuid
 from pdf_processor import process_pdf
+from sketch_processor import process_sketch
 
 app = FastAPI()
 
@@ -48,6 +49,40 @@ async def convert_pdf_to_dxf(file: UploadFile = File(...)):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
+    finally:
+        # Cleanup input file
+        if os.path.exists(input_path):
+            os.remove(input_path)
+
+@app.post("/convert-sketch")
+async def convert_sketch_to_dxf(file: UploadFile = File(...)):
+    valid_extensions = {".jpg", ".jpeg", ".png"}
+    ext = os.path.splitext(file.filename)[1].lower()
+    
+    if ext not in valid_extensions:
+        raise HTTPException(status_code=400, detail="Only JPG, JPEG, and PNG files are supported for sketches.")
+    
+    file_id = str(uuid.uuid4())
+    input_path = os.path.join(UPLOAD_DIR, f"{file_id}{ext}")
+    output_path = os.path.join(OUTPUT_DIR, f"{file_id}.dxf")
+    
+    try:
+        # Save uploaded file
+        with open(input_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        # Process the image sketch and generate DXF
+        process_sketch(input_path, output_path)
+        
+        # Return the generated DXF file
+        return FileResponse(
+            path=output_path, 
+            filename=file.filename.replace(ext, '.dxf'),
+            media_type='application/dxf'
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sketch conversion failed: {str(e)}")
     finally:
         # Cleanup input file
         if os.path.exists(input_path):
